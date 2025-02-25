@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Conciliación bancaria - 6856</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.css">
+</head>
+<body>
+    <header>
+        <h1>Conciliación bancaria</h1>
+        {% if user.is_authenticated %}
+            <p>Bienvenido, {{ user.nombre }} {{ user.apellido }} ({{ user.get_role_display }})</p>
+            <nav>
+                <a href="{% url 'home' %}">Inicio</a>
+
+                {% if user.role == 'admin' %}
+                    <a href="/register/">Gestión de Usuarios</a>
+                    <a href="/reportes/">Reportes</a>
+                    <a href="/conciliacion/">Conciliación</a>
+                    <a href="/auditoria/">Panel Auditoría</a>
+                {% endif %}
+                
+                {% if user.role == 'gerente' %}
+                    <a href="/reportes/">Documento verificado</a>
+                {% endif %}
+
+                {% if user.role == 'auditor' %}
+                    <a href="/auditoria/">Verificación del documento</a>
+                {% endif %}
+
+                {% if user.role == 'contador' %}
+                    <a href="/conciliacion/">Conciliaciones</a>
+                {% endif %}
+
+                <a href="{% url 'logout' %}">Cerrar sesión</a>
+            </nav>
+        {% else %}
+            <nav>
+                <a href="{% url 'login' %}">Iniciar sesión</a>
+            </nav>
+        {% endif %}
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

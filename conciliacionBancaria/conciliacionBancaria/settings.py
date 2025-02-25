@@ -10,7 +10,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
 # Applicaciones
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -25,8 +24,13 @@ INSTALLED_APPS = [
 
     # Aplicaciones propias
     'conciliacion',
-
+    'conciliacionBancaria',
+    'autentificacion',
+    'reportes',
+    #'admin_app'
 ]
+
+LOGIN_REDIRECT_URL = '/'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -38,12 +42,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'consiliacionBancaria.urls'
+ROOT_URLCONF = 'conciliacionBancaria.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [ BASE_DIR / 'conciliacion' / 'templates' ],
+        'DIRS': [ BASE_DIR / 'templates' ],  # Directorio global de plantillas
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -56,7 +60,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'consiliacionBancaria.wsgi.application'
+WSGI_APPLICATION = 'conciliacionBancaria.wsgi.application'
 
 
 # Database
@@ -93,13 +97,16 @@ AUTH_PASSWORD_VALIDATORS = [
 # Autenticación
 # AUTH_USER_MODEL = 'conciliacion.User'
 
+# Se define el modelo de usuario personalizado (ubicado en la app autenticacion)
+AUTH_USER_MODEL = 'autentificacion.User'
+
 # Configuración de archivos estáticos y media
 STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 LANGUAGE_CODE = 'es'
-TIME_ZONE = 'America/Argentina/Buenos_Aires'
+TIME_ZONE = 'America/Guayaquil'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True

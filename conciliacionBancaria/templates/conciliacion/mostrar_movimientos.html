@@ -1,0 +1,21 @@
+{% extends 'autentificacion/base.html' %}
+{% load static %}
+{% block content %}
+<h2>Movimientos Bancarios</h2>
+<table>
+  <tr>
+    <th>Fecha</th>
+    <th>Descripción</th>
+    <th>Monto</th>
+    <th>Referencia</th>
+  </tr>
+  {% for mov in movimientos %}
+  <tr>
+    <td>{{ mov.fecha }}</td>
+    <td>{{ mov.descripcion }}</td>
+    <td>{{ mov.monto }}</td>
+    <td>{{ mov.referencia }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock content %}

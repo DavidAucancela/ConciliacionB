@@ -1,0 +1,10 @@
+{% extends 'autenticacion/base.html' %}
+
+{% block content %}
+  <h2>Cargar Archivo Excel para la cuenta: {{ cuenta.nombre }}</h2>
+  <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="excel_file">
+    <button type="submit">Subir Archivo</button>
+</form>
+{% endblock %}
