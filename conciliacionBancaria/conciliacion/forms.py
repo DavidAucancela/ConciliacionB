@@ -1,5 +1,5 @@
 from django import forms
-from .models import Cuenta, Transaccion
+from .models import Cuenta, TransaccionContables
 
 class CuentaForm(forms.ModelForm):
     class Meta:
@@ -8,9 +8,13 @@ class CuentaForm(forms.ModelForm):
 
 class TransaccionForm(forms.ModelForm):
     class Meta:
-        model = Transaccion
-        fields = ['cuenta_origen', 'cuenta_destino', 'monto', 'tipo']
+        model = TransaccionContables
+        # Incluye solo los campos existentes, por ejemplo:
+        fields = ['monto', 'tipo']
+
+#class UploadFileForm(forms.Form):
+#    archivo_bancario = forms.FileField(label='Archivo de movimientos bancarios')
+#    archivo_empresarial = forms.FileField(label='Archivo de movimientos empresariales')
 
 class UploadFileForm(forms.Form):
-    archivo_bancario = forms.FileField(label='Archivo de movimientos bancarios')
-    archivo_empresarial = forms.FileField(label='Archivo de movimientos empresariales')
+    csv_file = forms.FileField()

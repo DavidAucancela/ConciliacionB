@@ -1,0 +1,10 @@
+{% extends 'autenticacion/base.html' %}
+
+{% block content %}
+    <h2>Cargar CSV para la cuenta: {{ cuenta.nombre }}</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Cargar CSV</button>
+    </form>
+{% endblock %}

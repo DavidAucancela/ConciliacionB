@@ -1,0 +1,29 @@
+{% extends 'autenticacion/base.html' %}
+{% load static %}
+{% block content %}
+<h2>Movimientos EMPRESARIALES</h2>
+<table>
+  <thead>
+      <tr>
+          <th>ID</th>
+          <th>Cuenta Origen</th>
+          <th>Cuenta Destino</th>
+          <th>Monto</th>
+          <th>Tipo</th>
+          <th>Fecha</th>
+      </tr>
+  </thead>
+  <tbody>
+      {% for transaccion in transaccionesBancarias %}
+      <tr>
+          <td>{{ transaccion.id }}</td>
+          <td>{{ transaccion.cuenta_origen.id }}</td>
+          <td>{{ transaccion.cuenta_destino.id }}</td>
+          <td>{{ transaccion.monto }}</td>
+          <td>{{ transaccion.tipo }}</td>
+          <td>{{ transaccion.fecha }}</td>
+      </tr>
+      {% endfor %}
+  </tbody>
+</table>
+{% endblock content %}

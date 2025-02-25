@@ -15,17 +15,16 @@
 
                 {% if user.role == 'admin' %}
                     <a href="/register/">Gestión de Usuarios</a>
-                    <a href="/reportes/">Reportes</a>
+                    <a href="/conciliacion/transacciones-agrupadas/">Reportes</a>
                     <a href="/conciliacion/">Conciliación</a>
-                    <a href="/auditoria/">Panel Auditoría</a>
                 {% endif %}
                 
                 {% if user.role == 'gerente' %}
-                    <a href="/reportes/">Documento verificado</a>
+                    <a href="/conciliacion/transacciones-agrupadas/">Documento verificado</a>
                 {% endif %}
 
                 {% if user.role == 'auditor' %}
-                    <a href="/auditoria/">Verificación del documento</a>
+                    <a href="/conciliacion/transacciones-agrupadas/">Verificación del documento</a>
                 {% endif %}
 
                 {% if user.role == 'contador' %}

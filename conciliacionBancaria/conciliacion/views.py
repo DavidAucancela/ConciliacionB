@@ -1,13 +1,20 @@
 import os
+import csv
 import pandas as pd
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.views.decorators.http import require_http_methods
 from django.conf import settings
-from .models import Cuenta, Transaccion, MovimientoBancario
+from .models import Cuenta, Transaccion, TransaccionBancarias, TransaccionContables
 from .forms import CuentaForm, TransaccionForm, UploadFileForm
-from django.core.files.storage import FileSystemStorage
+from .serializers import CuentaSerializer,  TransaccionSerializer
+from rest_framework import generics, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from dateutil.parser import parse as parse_datetime
+from django_filters import rest_framework as filters
+from django.views.generic import ListView
+from django.db.models import Sum, Case, When, F, FloatField
 
 # Definir la ruta para almacenar el archivo Excel de movimientos
 EXCEL_FILE_PATH = os.path.join(settings.MEDIA_ROOT, 'movimientos.xlsx')
@@ -45,6 +52,7 @@ def crear_cuenta(request):
 
 @login_required
 def crear_transaccion(request):
+
     if request.method == 'POST':
         form = TransaccionForm(request.POST)
         if form.is_valid():
@@ -58,164 +66,203 @@ def crear_transaccion(request):
     return render(request, 'conciliacion/crear_transaccion.html', {'form': form})
 
 @login_required
-def cargar_archivos(request):
-    """
-    Vista para cargar un archivo Excel, guardarlo en el servidor y registrar movimientos en la base de datos.
-    """
+def upload_csv(request):
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
-            excel_file = request.FILES['excel_file']
-            try:
-                # Guardar el archivo de forma permanente
-                fs = FileSystemStorage()
-                filename = fs.save(excel_file.name, excel_file)
-                file_url = fs.url(filename)
-
-                # Leer el archivo con pandas (puedes usar la ruta o directamente el objeto)
-                df = pd.read_excel(excel_file)
-
-                # Validar columnas esperadas
-                expected_columns = {'date', 'description', 'amount'}
-                if not expected_columns.issubset(df.columns):
-                    messages.error(request, "El archivo Excel debe contener las columnas: date, description, amount.")
-                    return redirect('upload_excel')
-
-                # (Opcional) Guardar el DataFrame a otro archivo o ruta, si es necesario
-                df.to_excel(EXCEL_FILE_PATH, index=False)
-
-                # Registrar movimientos en la base de datos
-                for _, row in df.iterrows():
-                    MovimientoBancario.objects.create(
-                        user=request.user,
-                        date=row['date'],
-                        description=row['description'],
-                        amount=row['amount']
-                    )
-
-                messages.success(request, "Archivo Excel cargado y movimientos registrados correctamente.")
-                return redirect('conciliar')
-            except Exception as e:
-                messages.error(request, f"Error al procesar el archivo Excel: {e}")
+            csv_file = request.FILES['csv_file']
+            # Se decodifica el archivo CSV (asumiendo codificación UTF-8)
+            decoded_file = csv_file.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded_file)
+            for row in reader:
+                # Se espera que el CSV tenga las columnas: 'cuenta_id', 'tipo' y 'monto'
+                cuenta_id = row.get('cuenta_id')
+                tipo = row.get('tipo')
+                monto = row.get('monto')
+                
+                # Valida que se hayan recibido todos los datos necesarios
+                if not (cuenta_id and tipo and monto):
+                    continue  # o podrías registrar el error en un log
+                
+                # Busca la cuenta correspondiente. Se podría hacer con un try/except para manejar errores.
+                cuenta = get_object_or_404(Cuenta, id=cuenta_id)
+                
+                # Crea la transacción
+                transaccion = Transaccion(
+                    cuenta=cuenta,
+                    tipo=tipo,
+                    monto=monto
+                )
+                transaccion.save()
+            # Redirecciona a alguna vista (por ejemplo, la lista de transacciones)
+            return redirect('lista_transacciones')
     else:
         form = UploadFileForm()
-    
-    return render(request, 'conciliacion/upload_excel.html', {'form': form})
+    return render(request, 'upload_csv.html', {'form': form})
 
-@login_required
-def conciliar(request):
-    """
-    Vista que muestra los movimientos cargados desde el archivo Excel.
-    Permite editar y actualizar los datos.
-    """
-    movimientos = []
-    try:
-        df = pd.read_excel(EXCEL_FILE_PATH)
-        movimientos = df.to_dict(orient='records')
-    except FileNotFoundError:
-        messages.info(request, "No se ha cargado ningún archivo Excel.")
-    except Exception as e:
-        messages.error(request, f"Error al leer el archivo Excel: {e}")
+class CargarTransaccionesView(APIView):
+    def post(self, request, *args, **kwargs):
+        # Verificar si se envió un archivo
+        if 'file' not in request.FILES:
+            return Response({"error": "No se proporcionó ningún archivo"}, status=status.HTTP_400_BAD_REQUEST)
 
-    return render(request, 'conciliacion/conciliar.html', {'movimientos': movimientos})
+        file = request.FILES['file']
+        decoded_file = file.read().decode('utf-8').splitlines()
+        reader = csv.reader(decoded_file)
 
-@login_required
-@require_http_methods(["POST"])
-def registrar_movimiento(request):
-    """
-    Vista para agregar un nuevo movimiento y actualizar el archivo Excel.
-    """
-    date = request.POST.get('date')
-    description = request.POST.get('description')
-    amount = request.POST.get('amount')
+        transacciones_creadas = 0
+        errores = []
 
-    if not all([date, description, amount]):
-        messages.error(request, "Todos los campos son requeridos.")
-        return redirect('conciliar')
+        for row in reader:
+            try:
+                # Extraer los datos de la fila
+                cuenta_origen_id = int(row[0])
+                cuenta_destino_id = int(row[1])
+                monto = float(row[2])
+                tipo = row[3]
+                fecha_str = row[4]
 
-    try:
-        df = pd.read_excel(EXCEL_FILE_PATH)
-    except FileNotFoundError:
-        df = pd.DataFrame(columns=['date', 'description', 'amount'])
-    except Exception as e:
-        messages.error(request, f"Error al leer el archivo Excel: {e}")
-        return redirect('conciliar')
+                # Convertir la fecha a un objeto datetime
+                fecha = parse_datetime(fecha_str)
 
-    new_movement = {'date': date, 'description': description, 'amount': amount}
-    df = df.append(new_movement, ignore_index=True)
+                # Obtener las cuentas de origen y destino
+                cuenta_origen = Cuenta.objects.get(id=cuenta_origen_id)
+                cuenta_destino = Cuenta.objects.get(id=cuenta_destino_id)
 
-    try:
-        df.to_excel(EXCEL_FILE_PATH, index=False)
-        MovimientoBancario.objects.create(
-            user=request.user,
-            date=date,
-            description=description,
-            amount=amount
+                # Crear la transacción
+                TransaccionBancarias.objects.create(
+                    cuenta_origen=cuenta_origen,
+                    cuenta_destino=cuenta_destino,
+                    monto=monto,
+                    tipo=tipo,
+                    fecha=fecha
+                )
+
+                transacciones_creadas += 1
+            except Cuenta.DoesNotExist:
+                errores.append(f"Cuenta no encontrada en la fila: {row}")
+            except Exception as e:
+                errores.append(f"Error en la fila {row}: {str(e)}")
+
+        if errores:
+            return Response({
+                "transacciones_creadas": transacciones_creadas,
+                "errores": errores
+            }, status=status.HTTP_207_MULTI_STATUS)
+        else:
+            return Response({
+                "transacciones_creadas": transacciones_creadas,
+                "mensaje": "Todas las transacciones fueron creadas exitosamente."
+            }, status=status.HTTP_201_CREATED)
+
+class CargarTransaccionesEmpresaView(APIView):
+    def post(self, request, *args, **kwargs):
+        # Verificar si se envió un archivo
+        if 'file' not in request.FILES:
+            return Response({"error": "No se proporcionó ningún archivo"}, status=status.HTTP_400_BAD_REQUEST)
+
+        file = request.FILES['file']
+        decoded_file = file.read().decode('utf-8').splitlines()
+        reader = csv.reader(decoded_file)
+
+        transacciones_creadas = 0
+        errores = []
+
+        for row in reader:
+            try:
+                # Extraer los datos de la fila
+                cuenta_origen_id = int(row[0])
+                cuenta_destino_id = int(row[1])
+                monto = float(row[2])
+                tipo = row[3]
+                fecha_str = row[4]
+
+                # Convertir la fecha a un objeto datetime
+                fecha = parse_datetime(fecha_str)
+
+                # Obtener las cuentas de origen y destino
+                cuenta_origen = Cuenta.objects.get(id=cuenta_origen_id)
+                cuenta_destino = Cuenta.objects.get(id=cuenta_destino_id)
+
+                # Crear la transacción
+                TransaccionContables.objects.create(
+                    cuenta_origen=cuenta_origen,
+                    cuenta_destino=cuenta_destino,
+                    monto=monto,
+                    tipo=tipo,
+                    fecha=fecha
+                )
+
+                transacciones_creadas += 1
+            except Cuenta.DoesNotExist:
+                errores.append(f"Cuenta no encontrada en la fila: {row}")
+            except Exception as e:
+                errores.append(f"Error en la fila {row}: {str(e)}")
+
+        if errores:
+            return Response({
+                "transacciones_creadas": transacciones_creadas,
+                "errores": errores
+            }, status=status.HTTP_207_MULTI_STATUS)
+        else:
+            return Response({
+                "transacciones_creadas": transacciones_creadas,
+                "mensaje": "Todas las transacciones fueron creadas exitosamente."
+            }, status=status.HTTP_201_CREATED)
+
+class CuentaListCreateView(generics.ListCreateAPIView):
+    queryset = Cuenta.objects.all()
+    serializer_class = CuentaSerializer
+
+class CuentaRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Cuenta.objects.all()
+    serializer_class = CuentaSerializer
+
+class TransaccionListView(ListView):
+    model = TransaccionBancarias
+    template_name = 'conciliacion/transacciones.html'  # Ruta del template
+    context_object_name = 'transacciones'  # Nombre de la variable de contexto
+
+class TransaccionBancoListView(ListView):
+    model = TransaccionContables
+    template_name = 'conciliacion/transaccionesEmpresariales.html'  # Ruta del template
+    context_object_name = 'transaccionesBancarias'  # Nombre de la variable de contexto
+
+def transacciones_agrupadas_view(request):
+    # Agrupar las transacciones bancarias con signo condicional
+    transacciones_agrupadas = TransaccionBancarias.objects.values('tipo').annotate(
+        total=Sum(
+            Case(
+                When(tipo='retiro', then=-F('monto')),
+                When(tipo__in=['deposito', 'transferencia'], then=F('monto')),
+                default=F('monto'),
+                output_field=FloatField()
+            )
         )
-        messages.success(request, "Movimiento registrado exitosamente.")
-    except Exception as e:
-        messages.error(request, f"Error al guardar el movimiento: {e}")
+    )
 
-    return redirect('conciliar')
+    # Agrupar las transacciones empresariales con la misma lógica
+    transacciones_agrupadas_empresariales = TransaccionContables.objects.values('tipo').annotate(
+        total=Sum(
+            Case(
+                When(tipo='retiro', then=-F('monto')),
+                When(tipo__in=['deposito', 'transferencia'], then=F('monto')),
+                default=F('monto'),
+                output_field=FloatField()
+            )
+        )
+    )
 
-@login_required
-@require_http_methods(["POST"])
-def actualizar_movimiento(request, row_index):
-    """
-    Vista para actualizar un movimiento en el archivo Excel y la base de datos.
-    """
-    try:
-        df = pd.read_excel(EXCEL_FILE_PATH)
-        if row_index >= len(df):
-            messages.error(request, "Índice inválido de movimiento.")
-            return redirect('conciliar')
+    # Calcular totales
+    total_bancarias = sum(item['total'] for item in transacciones_agrupadas)
+    total_empresariales = sum(item['total'] for item in transacciones_agrupadas_empresariales)
+    descuadre = total_bancarias - total_empresariales
 
-        df.loc[row_index, 'date'] = request.POST.get('date')
-        df.loc[row_index, 'description'] = request.POST.get('description')
-        df.loc[row_index, 'amount'] = request.POST.get('amount')
-
-        df.to_excel(EXCEL_FILE_PATH, index=False)
-
-        movimiento = MovimientoBancario.objects.filter(user=request.user)[row_index]
-        movimiento.date = request.POST.get('date')
-        movimiento.description = request.POST.get('description')
-        movimiento.amount = request.POST.get('amount')
-        movimiento.save()
-
-        messages.success(request, "Movimiento actualizado exitosamente.")
-    except Exception as e:
-        messages.error(request, f"Error al actualizar el movimiento: {e}")
-
-    return redirect('conciliar')
-
-@login_required
-@require_http_methods(["POST"])
-def eliminar_movimiento(request, row_index):
-    """
-    Vista para eliminar un movimiento en el archivo Excel y la base de datos.
-    """
-    try:
-        df = pd.read_excel(EXCEL_FILE_PATH)
-        if row_index >= len(df):
-            messages.error(request, "Índice inválido de movimiento.")
-            return redirect('conciliar')
-
-        df.drop(index=row_index, inplace=True)
-        df.to_excel(EXCEL_FILE_PATH, index=False)
-
-        movimiento = MovimientoBancario.objects.filter(user=request.user)[row_index]
-        movimiento.delete()
-
-        messages.success(request, "Movimiento eliminado exitosamente.")
-    except Exception as e:
-        messages.error(request, f"Error al eliminar el movimiento: {e}")
-
-    return redirect('conciliar')
-
-@login_required
-def mostrar_movimientos(request):
-    """
-    Vista para mostrar los movimientos almacenados en la base de datos.
-    """
-    movimientos = MovimientoBancario.objects.filter(user=request.user)
-    return render(request, 'conciliacion/mostrar_movimientos.html', {'movimientos': movimientos})
+    context = {
+        'transacciones_agrupadas': transacciones_agrupadas, 
+        'transacciones_agrupadas_empresariales': transacciones_agrupadas_empresariales,
+        'total_bancarias': total_bancarias,
+        'total_empresariales': total_empresariales,
+        'descuadre': descuadre,
+    }
+    return render(request, 'conciliacion/transacciones_agrupadas.html', context)

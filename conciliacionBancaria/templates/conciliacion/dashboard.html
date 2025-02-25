@@ -9,9 +9,13 @@
         <li><a href="{% url 'dashboard' %}">Home</a></li>
         <li><a href="{% url 'crear_cuenta' %}">Crear Cuenta</a></li>
         <li><a href="{% url 'crear_transaccion' %}">Crear Transacción</a></li>
-        <li><a href="{% url 'cargar_archivos' %}">Cargar Archivos Excel</a></li>
-        <li><a href="{% url 'mostrar_movimientos' %}">Mostrar Movimientos</a></li>
-        <li><a href="{% url 'conciliar' %}">Conciliar Movimientos</a></li>
+        
+        <li><a href="{% url 'cargar_transacciones_banco' %}">Cargar movimientos bancarios CSV</a></li>
+        <li><a href="{% url 'cargar_transacciones_empresa' %}">Cargar libro contable CSV</a></li>
+        
+        <li><a href="{% url 'transaccion-list-empresa' %}">Listar movimientos bancarias</a></li>
+        <li><a href="{% url 'transaccion-list-banco' %}">Listar movimientos empresariales</a></li>
+      </ul>
       </ul>
     </nav>
   </header>

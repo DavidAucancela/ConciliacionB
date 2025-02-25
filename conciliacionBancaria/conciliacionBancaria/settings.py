@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     'conciliacion',
     'conciliacionBancaria',
     'autentificacion',
-    'reportes',
     #'admin_app'
 ]
 

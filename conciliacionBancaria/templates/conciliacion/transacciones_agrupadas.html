@@ -1,0 +1,77 @@
+{% extends 'autenticacion/base.html' %}
+{% load static %}
+{% block content %}
+<h2>Movimientos Bancarios</h2>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Tipo</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for transaccion in transacciones_agrupadas %}
+        <tr>
+            <td>{{ transaccion.tipo }}</td>
+            <td>{{ transaccion.total }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2">No hay movimientos bancarios</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <th>Total Bancarias</th>
+            <th>{{ total_bancarias }}</th>
+        </tr>
+    </tfoot>
+</table>
+
+<h2>Movimientos Empresariales</h2>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Tipo</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for transaccion in transacciones_agrupadas_empresariales %}
+        <tr>
+            <td>{{ transaccion.tipo }}</td>
+            <td>{{ transaccion.total }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2">No hay movimientos empresariales</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <th>Total Empresariales</th>
+            <th>{{ total_empresariales }}</th>
+        </tr>
+    </tfoot>
+</table>
+
+<h2>Resumen General de Transacciones</h2>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Total Bancarias</th>
+            <th>Total Empresariales</th>
+            <th>Descuadre</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>{{ total_bancarias }}</td>
+            <td>{{ total_empresariales }}</td>
+            <td>{{ descuadre }}</td>
+        </tr>
+    </tbody>
+</table>
+{% endblock content %}
